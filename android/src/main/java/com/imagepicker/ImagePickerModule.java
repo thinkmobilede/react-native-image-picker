@@ -47,6 +47,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.ref.WeakReference;
 import java.util.List;
+import java.util.UUID;
 
 import com.facebook.react.modules.core.PermissionListener;
 import com.facebook.react.modules.core.PermissionAwareActivity;
@@ -376,10 +377,30 @@ public class ImagePickerModule extends ReactContextBaseJavaModule
     }
 
     Uri uri = null;
+    final boolean saveInternally = this.options.hasKey("storageOptions") && (this.options.getMap("storageOptions").hasKey("saveInternally") && this.options.getMap("storageOptions").getBoolean("saveInternally"));
     switch (requestCode)
     {
       case REQUEST_LAUNCH_IMAGE_CAPTURE:
         uri = cameraCaptureURI;
+        if (saveInternally) {
+            String realPath = getRealPathFromURI(uri);
+            try
+            {
+                File file = createFileFromURI(uri, saveInternally, realPath);
+                realPath = file.getAbsolutePath();
+                uri = Uri.fromFile(file);
+            }
+            catch (Exception e)
+            {
+                // image not in cache
+                responseHelper.putString("error", "Could not read photo");
+                responseHelper.putString("uri", uri.toString());
+                responseHelper.invokeResponse(callback);
+                callback = null;
+                return;
+            }
+            imageConfig = imageConfig.withOriginalFile(new File(realPath));
+        }
         break;
 
       case REQUEST_LAUNCH_IMAGE_LIBRARY:
@@ -387,11 +408,11 @@ public class ImagePickerModule extends ReactContextBaseJavaModule
         String realPath = getRealPathFromURI(uri);
         final boolean isUrl = !TextUtils.isEmpty(realPath) &&
                 Patterns.WEB_URL.matcher(realPath).matches();
-        if (realPath == null || isUrl)
+        if (realPath == null || isUrl || saveInternally)
         {
           try
           {
-            File file = createFileFromURI(uri);
+            File file = createFileFromURI(uri, saveInternally, realPath);
             realPath = file.getAbsolutePath();
             uri = Uri.fromFile(file);
           }
@@ -647,8 +668,28 @@ public class ImagePickerModule extends ReactContextBaseJavaModule
    * @return File
    * @throws Exception
    */
-  private File createFileFromURI(Uri uri) throws Exception {
-    File file = new File(reactContext.getExternalCacheDir(), "photo-" + uri.getLastPathSegment());
+  private File createFileFromURI(Uri uri, boolean saveInternally, String realPath) throws Exception {
+    File file = null;
+    if (saveInternally) {
+        file = reactContext.getFilesDir();
+        if (this.options.hasKey("storageOptions") && this.options.getMap("storageOptions").hasKey("path")) {
+            file = new File(file, this.options.getMap("storageOptions").getString("path"));
+        }
+        String path = realPath;
+        if (imageConfig.original != null) {
+            path = imageConfig.original.getAbsolutePath();
+        }
+        int index = path.lastIndexOf(".");
+        if (index > path.length() - 5) {
+            String filename = UUID.randomUUID().toString() + path.substring(index);
+            file = new File(file, filename);
+        } else {
+            file = new File(file, UUID.randomUUID().toString() + ".jpg");
+        }
+        updatedResultResponse(Uri.fromFile(file), realPath);
+    } else {
+        file = new File(reactContext.getExternalCacheDir(), "photo-" + uri.getLastPathSegment());
+    }
     InputStream input = reactContext.getContentResolver().openInputStream(uri);
     OutputStream output = new FileOutputStream(file);
 
