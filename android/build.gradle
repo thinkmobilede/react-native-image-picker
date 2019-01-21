@@ -1,10 +1,12 @@
-import groovy.json.JsonSlurper
+//import groovy.json.JsonSlurper
 
 def computeVersionName() {
+    return "0.28.0"
     // dynamically retrieve version from package.json
+    /*
     def slurper = new JsonSlurper()
     def json = slurper.parse(file('../package.json'), "utf-8")
-    return json.version
+    return json.version*/
 }
 
 buildscript {
