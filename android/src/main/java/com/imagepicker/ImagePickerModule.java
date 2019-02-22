@@ -674,6 +674,7 @@ public class ImagePickerModule extends ReactContextBaseJavaModule
         file = reactContext.getFilesDir();
         if (this.options.hasKey("storageOptions") && this.options.getMap("storageOptions").hasKey("path")) {
             file = new File(file, this.options.getMap("storageOptions").getString("path"));
+            file.mkdirs();
         }
         String path = realPath;
         if (imageConfig.original != null) {
@@ -686,7 +687,7 @@ public class ImagePickerModule extends ReactContextBaseJavaModule
         } else {
             file = new File(file, UUID.randomUUID().toString() + ".jpg");
         }
-        updatedResultResponse(Uri.fromFile(file), realPath);
+        updatedResultResponse(Uri.fromFile(file), path);
     } else {
         file = new File(reactContext.getExternalCacheDir(), "photo-" + uri.getLastPathSegment());
     }
