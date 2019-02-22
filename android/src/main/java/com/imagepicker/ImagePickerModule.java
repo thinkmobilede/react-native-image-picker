@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -21,7 +22,6 @@ import android.text.TextUtils;
 import android.util.Base64;
 import android.util.Patterns;
 import android.webkit.MimeTypeMap;
-import android.content.pm.PackageManager;
 
 import com.facebook.react.ReactActivity;
 import com.facebook.react.bridge.ActivityEventListener;
@@ -30,9 +30,11 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.modules.core.PermissionAwareActivity;
+import com.facebook.react.modules.core.PermissionListener;
 import com.imagepicker.media.ImageConfig;
-import com.imagepicker.permissions.PermissionUtils;
 import com.imagepicker.permissions.OnImagePickerPermissionsCallback;
+import com.imagepicker.permissions.PermissionUtils;
 import com.imagepicker.utils.MediaUtils.ReadExifResult;
 import com.imagepicker.utils.RealPathUtil;
 import com.imagepicker.utils.UI;
@@ -49,12 +51,13 @@ import java.lang.ref.WeakReference;
 import java.util.List;
 import java.util.UUID;
 
-import com.facebook.react.modules.core.PermissionListener;
-import com.facebook.react.modules.core.PermissionAwareActivity;
-
-import static com.imagepicker.utils.MediaUtils.*;
+import static com.imagepicker.utils.MediaUtils.RolloutPhotoResult;
 import static com.imagepicker.utils.MediaUtils.createNewFile;
+import static com.imagepicker.utils.MediaUtils.fileScan;
 import static com.imagepicker.utils.MediaUtils.getResizedImage;
+import static com.imagepicker.utils.MediaUtils.readExifInterface;
+import static com.imagepicker.utils.MediaUtils.removeUselessFiles;
+import static com.imagepicker.utils.MediaUtils.rolloutPhotoFromCamera;
 
 public class ImagePickerModule extends ReactContextBaseJavaModule
         implements ActivityEventListener
@@ -565,15 +568,17 @@ public class ImagePickerModule extends ReactContextBaseJavaModule
   {
     final int writePermission = ActivityCompat
             .checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE);
-    final int cameraPermission = ActivityCompat
-            .checkSelfPermission(activity, Manifest.permission.CAMERA);
 
-    final boolean permissionsGrated = writePermission == PackageManager.PERMISSION_GRANTED &&
-            cameraPermission == PackageManager.PERMISSION_GRANTED;
+    boolean permissionsGrated = writePermission == PackageManager.PERMISSION_GRANTED;
+
+    final boolean saveInternally = this.options.hasKey("storageOptions") && (this.options.getMap("storageOptions").hasKey("saveInternally") && this.options.getMap("storageOptions").getBoolean("saveInternally"));
+    if (saveInternally && requestCode == REQUEST_PERMISSIONS_FOR_LIBRARY) {
+        permissionsGrated = true;
+    }
 
     if (!permissionsGrated)
     {
-      final Boolean dontAskAgain = ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) && ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.CAMERA);
+      final Boolean dontAskAgain = ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE);
 
       if (dontAskAgain)
       {
@@ -619,7 +624,7 @@ public class ImagePickerModule extends ReactContextBaseJavaModule
       }
       else
       {
-        String[] PERMISSIONS = {Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA};
+        String[] PERMISSIONS = {Manifest.permission.WRITE_EXTERNAL_STORAGE};
         if (activity instanceof ReactActivity)
         {
           ((ReactActivity) activity).requestPermissions(PERMISSIONS, requestCode, listener);
