@@ -571,11 +571,6 @@ public class ImagePickerModule extends ReactContextBaseJavaModule
 
     boolean permissionsGrated = writePermission == PackageManager.PERMISSION_GRANTED;
 
-    final boolean saveInternally = this.options.hasKey("storageOptions") && (this.options.getMap("storageOptions").hasKey("saveInternally") && this.options.getMap("storageOptions").getBoolean("saveInternally"));
-    if (saveInternally && requestCode == REQUEST_PERMISSIONS_FOR_LIBRARY) {
-        permissionsGrated = true;
-    }
-
     if (!permissionsGrated)
     {
       final Boolean dontAskAgain = ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE);
